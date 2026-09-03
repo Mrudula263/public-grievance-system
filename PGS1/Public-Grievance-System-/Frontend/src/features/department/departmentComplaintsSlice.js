@@ -1,0 +1,181 @@
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import axios from "axios";
+
+const getToken = (getState) => getState().auth.token;
+
+
+export const fetchDepartmentComplaints = createAsyncThunk(
+  "department/fetchComplaints",
+  async ({departmentId}, { getState, rejectWithValue }) => {
+    try {
+      const token = getToken(getState);
+    //   const departmentId = getState().auth.user.departmentId; // <-- fetch from auth
+      const response = await axios.get(
+        `http://localhost:8080/api/departments/${departmentId}/complaints/assigned`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to fetch assigned complaints."
+      );
+    }
+  }
+);
+// export const fetchDepartmentStatus = createAsyncThunk(
+//   'department/fetchByStatus',
+//   async (status, { getState, rejectWithValue }) => {
+//     try {
+//       const token = getState().auth.token;
+//       // Sahi API URL ko call karein
+//       const response = await axios.get(
+//         `http://localhost:8080/api/department/complaints/status/ASSIGNED`,
+//         { headers: { Authorization: `Bearer ${token}` } }
+//       );
+//       return response.data;
+//     } catch (err) {
+//       return rejectWithValue(err.response?.data?.message || 'Failed to fetch complaints by status.');
+//     }
+//   }
+// );
+
+
+// export const updateComplaintStatus = createAsyncThunk(
+//   "department/updateStatus",
+//   async ({ complaintId, status, photoUrl }, { getState, rejectWithValue }) => {
+//     try {
+//       const token = getToken(getState);
+
+//       let url = "";
+//       let config = {
+//         headers: { Authorization: `Bearer ${token}` },
+//       };
+
+//       if (status === "RESOLVED") {
+//         url = `http://localhost:8080/api/department/resolve/${complaintId}?photoUrl=${encodeURIComponent(
+//           photoUrl || ""
+//         )}`;
+//       } else if (status === "REJECTED") {
+//         url = `http://localhost:8080/api/department/reject/${complaintId}`;
+//       } else {
+//         return rejectWithValue("Invalid status");
+//       }
+
+//       const response = await axios.put(url, {}, config);
+//       return response.data;
+//     } catch (err) {
+//       return rejectWithValue(
+//         err.response?.data?.message || "Failed to update status."
+//       );
+//     }
+//   }
+// );
+
+export const updateComplaintStatus = createAsyncThunk(
+    'department/updateStatus',
+    async ({ complaintId, status }, { getState, rejectWithValue }) => {
+        try {
+            const token = getToken(getState);
+            const response = await axios.put(
+                `http://localhost:8080/api/departments/complaints/${complaintId}/status?status=${status}`,
+                {}, 
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+            return response.data;
+        } catch (err) {
+            return rejectWithValue(err.response?.data?.message || 'Failed to update status.');
+        }
+    }
+);
+
+
+export const uploadDepartmentDocument = createAsyncThunk(
+  "department/uploadDocument",
+  async ({ complaintId, file }, { getState, rejectWithValue }) => {
+    try {
+      const token = getToken(getState);
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await axios.post(
+        `http://localhost:8080/api/department/complaints/${complaintId}/upload`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      return response.data;
+    } catch (err) {
+      return rejectWithValue(
+        err.response?.data?.message || "Failed to upload document."
+      );
+    }
+  }
+);
+
+// --- REDUX SLICE ---
+const departmentSlice = createSlice({
+  name: "department",
+  initialState: {
+    complaints: [],
+    loading: false,
+    error: null,
+  },
+  reducers: {},
+  extraReducers: (builder) => {
+    builder
+      // Fetch complaints
+      .addCase(fetchDepartmentComplaints.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchDepartmentComplaints.fulfilled, (state, action) => {
+        state.loading = false;
+        state.complaints = action.payload;
+      })
+      .addCase(fetchDepartmentComplaints.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      // .addCase(fetchDepartmentStatus.pending, (state) => {
+      //   state.loading = true;
+      //   state.error = null;
+      // })
+      // .addCase(fetchDepartmentStatus.fulfilled, (state, action) => {
+      //   state.loading = false;
+      //   state.complaints = action.payload;
+      // })
+      // .addCase(fetchDepartmentStatus.rejected, (state, action) => {
+      //   state.loading = false;
+      //   state.error = action.payload;
+      // })
+
+      // Update complaint after status change
+      .addCase(updateComplaintStatus.fulfilled, (state, action) => {
+        const index = state.complaints.findIndex(
+          (c) => c.id === action.payload.id
+        );
+        if (index !== -1) {
+          state.complaints[index] = action.payload;
+        }
+      })
+
+      // Update complaint after document upload
+      .addCase(uploadDepartmentDocument.fulfilled, (state, action) => {
+        const index = state.complaints.findIndex(
+          (c) => c.id === action.payload.id
+        );
+        if (index !== -1) {
+          state.complaints[index] = action.payload;
+        }
+      });
+  },
+});
+
+export default departmentSlice.reducer;
