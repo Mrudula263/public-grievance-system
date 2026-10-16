@@ -1,1 +1,5 @@
 node_modules/
+
+backend-project/app/uploads/
+backend-project/app/dept-document/
+.vscode/
